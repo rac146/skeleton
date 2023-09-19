@@ -23,6 +23,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 	let scrollTarget = 'body';
 	let headings: NodeListOf<HTMLElement> | undefined;
 	let permalinks: TOCHeadingLink[] = [];
+	let observers: IntersectionObserver[] = [];
 
 	function init(): void {
 		// Set accepted list of query elements
@@ -40,7 +41,18 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 	}
 
 	function queryHeadings(): void {
+
+		let permalinkIndexCount = 0;
+
+		for(const obs of observers)
+		{
+			obs.disconnect();
+		}
+
+		observers = [];
+
 		headings?.forEach((elemHeading) => {
+
 			// If heading has ignore attribute, skip it
 			if (elemHeading.hasAttribute('data-toc-ignore')) return;
 			// If generate mode and heading ID not present, assign one
@@ -60,38 +72,47 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 				id: elemHeading.id,
 				text: elemHeading.firstChild?.textContent?.trim() || ''
 			});
+
+			const headingIndex = permalinkIndexCount++;
+
+			const observer = new IntersectionObserver(([entry]) => {
+				if (entry.boundingClientRect.top > 0) {
+					if (entry.isIntersecting) {
+						tocActiveId.set(elemHeading.id);
+					} else {
+						const newIndex = headingIndex > 0 ? headingIndex - 1 : 0
+						tocActiveId.set(permalinks[newIndex].id);
+
+						console.log(elemHeading, permalinks[newIndex])
+					}
+				  }
+			}, {
+				root: document.querySelector(scrollTarget),
+				threshold: 0
+			});
+
+			observer.observe(elemHeading);
+			observers.push(observer);
 		});
+
+		tocActiveId.set(permalinks[0].id);
+
 		// Set the store with the permalink array
 		tocStore.set(permalinks);
 	}
 
-	// Listens to scroll event, determines top-most heading, provides that to the `tocActiveId` store
-	function onWindowScroll(e: WindowEventMap['scroll']): void {
-		if (!headings?.length) return;
-		const targetElem = e.target;
-		if (!(targetElem instanceof HTMLElement)) throw new Error('scrollTarget is not an HTMLElement');
-
-		const scrollableTop = targetElem.getBoundingClientRect().top || 0;
-		const headingSizeThreshold = 40; // px
-
-		for (const elemHeading of headings) {
-			const headerBoundTop = elemHeading.getBoundingClientRect().top;
-			const offsetTop = headerBoundTop - scrollableTop + headingSizeThreshold;
-			if (offsetTop >= 0) return tocActiveId.set(elemHeading.id);
-		}
-	}
-
 	// Lifecycle
 	init();
-	if (scrollTarget) document.querySelector(scrollTarget)?.addEventListener('scroll', onWindowScroll);
-
 	return {
 		update(newArgs: TOCCrawlerArgs) {
 			args = newArgs;
 			init();
 		},
 		destroy() {
-			if (scrollTarget) document.querySelector(scrollTarget)?.removeEventListener('scroll', onWindowScroll);
+			for(const obs of observers)
+			{
+				obs.disconnect();
+			}
 		}
 	};
 }
