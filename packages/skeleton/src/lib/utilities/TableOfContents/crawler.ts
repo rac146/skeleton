@@ -74,74 +74,23 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 				isVisible: false
 			});
 
-			const headingIndex = permalinkIndexCount++;
-			const element = document.querySelector(scrollTarget) as HTMLElement;
+			const nextSibling = elemHeading.nextElementSibling;
+
+			//for this to work, the sibling after a header MUST have the data-toc-content attribute
+			if(!nextSibling?.hasAttribute('data-toc-content')) return;
 
 			const observer = new IntersectionObserver(([entry]) => {
-						
-				if (!entry.isIntersecting) {
-
-					if(entry.rootBounds && entry.boundingClientRect.top < entry.rootBounds.top) {
-						console.log('outside top', elemHeading, entry)
-						permalinks[headingIndex].isVisible = false;
-
-						//must check if any other headingIndex is currently visible
-						for(let x = (headingIndex + 1); x < permalinks.length; x++) 
-						{
-							const nextHeading = permalinks[x];
-
-							if(nextHeading.isVisible) {
-								tocActiveId.set(nextHeading.id);
-								break;
-							}
-
-						}
-					} else if(entry.rootBounds && entry.boundingClientRect.bottom >= entry.rootBounds.bottom) {
-						console.log('outside bottom', elemHeading, entry)
-
-						//should only trigger if no other elements are visible
-						const elemCheck = permalinks.find((x, index) => index != headingIndex && x.isVisible);
-
-						if(headingIndex > 0 && !elemCheck) {
-							tocActiveId.set(permalinks[headingIndex - 1].id);
-						}
-
-						permalinks[headingIndex].isVisible = false;
-					}
-
-				} else {
-
-					console.log('inside', elemHeading, entry)
-
-					permalinks[headingIndex].isVisible = true;
-
-					let checkPrevious = true;
-
-					//must check if any other headingIndex is currently visible
-					for(let x = 0; x < headingIndex; x++) 
-					{
-						const prevHeading = permalinks[x];
-
-						if(prevHeading.isVisible) {
-							checkPrevious = false;
-							break;
-						}
-					}
-
-					if(checkPrevious) {
-						tocActiveId.set(elemHeading.id);
-					}
+				if (entry.isIntersecting) {
+					tocActiveId.set(elemHeading.id);
 				}
 			}, {
-				root: element,
-				threshold: 0
+				rootMargin: '-50% 0px' ,
+				threshold: 0,
 			});
 
-			observer.observe(elemHeading);
+			observer.observe(nextSibling);
 			observers.push(observer);
 		});
-
-		tocActiveId.set(permalinks[0].id);
 
 		// Set the store with the permalink array
 		tocStore.set(permalinks);
