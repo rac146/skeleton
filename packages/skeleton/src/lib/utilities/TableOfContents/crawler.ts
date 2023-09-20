@@ -141,8 +141,6 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 			observers.push(observer);
 		});
 
-		tocActiveId.set(permalinks[0].id);
-
 		// Set the store with the permalink array
 		tocStore.set(permalinks);
 	}
