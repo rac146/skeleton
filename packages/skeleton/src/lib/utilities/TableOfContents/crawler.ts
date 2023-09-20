@@ -99,7 +99,10 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 					} else if(entry.rootBounds && entry.boundingClientRect.bottom >= entry.rootBounds.bottom) {
 						console.log('outside bottom', elemHeading, entry)
 
-						if(headingIndex > 0) {
+						//should only trigger if no other elements are visible
+						const elemCheck = permalinks.find((x, index) => index != headingIndex && x.isVisible);
+
+						if(headingIndex > 0 && !elemCheck) {
 							tocActiveId.set(permalinks[headingIndex - 1].id);
 						}
 
@@ -137,6 +140,8 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 			observer.observe(elemHeading);
 			observers.push(observer);
 		});
+
+		tocActiveId.set(permalinks[0].id);
 
 		// Set the store with the permalink array
 		tocStore.set(permalinks);
