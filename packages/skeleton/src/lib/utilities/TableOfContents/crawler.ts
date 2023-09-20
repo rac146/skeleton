@@ -36,20 +36,18 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 		headings = node.querySelectorAll(queryElements);
 		permalinks = [];
 
-		// Query and process the headings
-		queryHeadings();
-	}
-
-	function queryHeadings(): void {
-
-		let permalinkIndexCount = 0;
-
 		for(const obs of observers)
 		{
 			obs.disconnect();
 		}
 
 		observers = [];
+
+		// Query and process the headings
+		queryHeadings();
+	}
+
+	function queryHeadings(): void {
 
 		headings?.forEach((elemHeading) => {
 
