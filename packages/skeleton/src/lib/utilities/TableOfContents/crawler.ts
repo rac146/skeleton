@@ -131,7 +131,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 				}
 			}, {
 				root: element,
-				threshold: 1
+				threshold: 0
 			});
 
 			observer.observe(elemHeading);
