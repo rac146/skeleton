@@ -70,32 +70,73 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 			permalinks.push({
 				element: elemHeading.nodeName.toLowerCase(),
 				id: elemHeading.id,
-				text: elemHeading.firstChild?.textContent?.trim() || ''
+				text: elemHeading.firstChild?.textContent?.trim() || '',
+				isVisible: false
 			});
 
 			const headingIndex = permalinkIndexCount++;
+			const element = document.querySelector(scrollTarget) as HTMLElement;
 
 			const observer = new IntersectionObserver(([entry]) => {
-				if (entry.boundingClientRect.top > 0) {
-					if (entry.isIntersecting) {
-						tocActiveId.set(elemHeading.id);
-					} else {
-						const newIndex = headingIndex > 0 ? headingIndex - 1 : 0
-						tocActiveId.set(permalinks[newIndex].id);
+						
+				if (!entry.isIntersecting) {
 
-						console.log(elemHeading, permalinks[newIndex])
+					if(entry.rootBounds && entry.boundingClientRect.top < entry.rootBounds.top) {
+						console.log('outside top', elemHeading, entry)
+						permalinks[headingIndex].isVisible = false;
+
+						//must check if any other headingIndex is currently visible
+						for(let x = (headingIndex + 1); x < permalinks.length; x++) 
+						{
+							const nextHeading = permalinks[x];
+
+							if(nextHeading.isVisible) {
+								tocActiveId.set(nextHeading.id);
+								break;
+							}
+
+						}
+					} else if(entry.rootBounds && entry.boundingClientRect.bottom >= entry.rootBounds.bottom) {
+						console.log('outside bottom', elemHeading, entry)
+
+						if(headingIndex > 0) {
+							tocActiveId.set(permalinks[headingIndex - 1].id);
+						}
+
+						permalinks[headingIndex].isVisible = false;
 					}
-				  }
+
+				} else {
+
+					console.log('inside', elemHeading, entry)
+
+					permalinks[headingIndex].isVisible = true;
+
+					let checkPrevious = true;
+
+					//must check if any other headingIndex is currently visible
+					for(let x = 0; x < headingIndex; x++) 
+					{
+						const prevHeading = permalinks[x];
+
+						if(prevHeading.isVisible) {
+							checkPrevious = false;
+							break;
+						}
+					}
+
+					if(checkPrevious) {
+						tocActiveId.set(elemHeading.id);
+					}
+				}
 			}, {
-				root: document.querySelector(scrollTarget),
-				threshold: 0
+				root: element,
+				threshold: 1
 			});
 
 			observer.observe(elemHeading);
 			observers.push(observer);
 		});
-
-		tocActiveId.set(permalinks[0].id);
 
 		// Set the store with the permalink array
 		tocStore.set(permalinks);
