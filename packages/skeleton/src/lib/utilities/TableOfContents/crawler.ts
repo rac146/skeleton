@@ -91,6 +91,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 			}, {
 				rootMargin: '-50% 0px' ,
 				threshold: 0,
+				root: scrollContainer,
 			});
 
 			observers.push({
