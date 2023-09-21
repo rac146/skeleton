@@ -6,3 +6,8 @@ export interface TOCHeadingLink {
 	text: string;
 	isVisible: boolean;
 }
+
+export interface ObserverItem {
+	observer: IntersectionObserver;
+	element: Element;
+}

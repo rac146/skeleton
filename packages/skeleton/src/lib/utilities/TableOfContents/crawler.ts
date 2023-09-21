@@ -1,7 +1,7 @@
 // Action: Table of Contents Crawler
 
 import { tocStore, tocActiveId } from './stores.js';
-import type { TOCHeadingLink } from './types.js';
+import type { ObserverItem, TOCHeadingLink } from './types.js';
 
 interface TOCCrawlerArgs {
 	/** Set generate mode to automatically set heading IDs. */
@@ -23,7 +23,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 	let scrollTarget = 'body';
 	let headings: NodeListOf<HTMLElement> | undefined;
 	let permalinks: TOCHeadingLink[] = [];
-	let observers: any[] = [];
+	let observers: ObserverItem[] = [];
 
 	function init(): void {
 		// Set accepted list of query elements
@@ -38,7 +38,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 
 		for(const obs of observers)
 		{
-			obs.disconnect();
+			obs.observer.disconnect();
 		}
 
 		observers = [];
