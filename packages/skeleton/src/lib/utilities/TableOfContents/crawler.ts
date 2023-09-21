@@ -23,7 +23,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 	let scrollTarget = 'body';
 	let headings: NodeListOf<HTMLElement> | undefined;
 	let permalinks: TOCHeadingLink[] = [];
-	let observers: IntersectionObserver[] = [];
+	let observers: any[] = [];
 
 	function init(): void {
 		// Set accepted list of query elements
@@ -48,6 +48,9 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 	}
 
 	function queryHeadings(): void {
+
+		let permalinkIndexCount = 0;
+		const scrollContainer = document.querySelector(scrollTarget) as HTMLElement;
 
 		headings?.forEach((elemHeading) => {
 
@@ -77,8 +80,12 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 			//for this to work, the sibling after a header MUST have the data-toc-content attribute
 			if(!nextSibling?.hasAttribute('data-toc-content')) return;
 
+			let isDetectTop = false;
+			let isDetectBottom = false;
+			const headingIndex = permalinkIndexCount++;
+
 			const observer = new IntersectionObserver(([entry]) => {
-				if (entry.isIntersecting) {
+				if (entry.isIntersecting && !isDetectTop && !isDetectBottom) {
 					tocActiveId.set(elemHeading.id);
 				}
 			}, {
@@ -86,16 +93,83 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 				threshold: 0,
 			});
 
-			observer.observe(nextSibling);
-			observers.push(observer);
+			observers.push({
+				observer: observer,
+				element: nextSibling,
+			});
+
+			//this observer looks for top content only
+			const observerTop = new IntersectionObserver(
+				([entry]) => {
+					const topBounds = entry?.rootBounds?.top ?? 0;
+
+					if (entry.isIntersecting) {
+						tocActiveId.set(elemHeading.id);
+						isDetectTop = true;
+					} else if (isDetectTop && entry.boundingClientRect.y < topBounds) {
+						tocActiveId.set(permalinks[headingIndex + 1].id);
+						isDetectTop = false;
+					}
+				},
+				{
+					rootMargin: '1px 0px -50% 0px',
+					threshold: 1,
+					root: scrollContainer,
+				}
+			);
+
+			observers.push({
+				observer: observerTop,
+				element: nextSibling,
+			});
+
+			//this observer looks for bottom content only
+			const observerBottom = new IntersectionObserver(
+				([entry]) => {
+					const bottomBounds = entry?.rootBounds?.bottom ?? 0;
+
+					if (entry.isIntersecting) {
+						tocActiveId.set(elemHeading.id);
+						isDetectBottom = true;
+					} else if (isDetectBottom && entry.boundingClientRect.bottom > bottomBounds) {
+						tocActiveId.set(permalinks[headingIndex - 1].id);
+						isDetectBottom = false;
+					}
+				},
+				{
+					rootMargin: '-50% 0px 1px 0px',
+					threshold: 1,
+					root: scrollContainer,
+				}
+			);
+
+			observers.push({
+				observer: observerBottom,
+				element: nextSibling,
+			});
 		});
+
+		//set index 0 as the default
+		tocActiveId.set(permalinks[0].id);
 
 		// Set the store with the permalink array
 		tocStore.set(permalinks);
 	}
 
+	function onWindowScroll(): void {
+
+		//don't start observing anything until user starts scrolling
+		for (const obsItem of observers) {
+			obsItem.observer.observe(obsItem.element);
+		}
+
+		document.querySelector(scrollTarget)?.removeEventListener('scroll', onWindowScroll);
+	}
+
 	// Lifecycle
 	init();
+	if (scrollTarget) document.querySelector(scrollTarget)?.addEventListener('scroll', onWindowScroll);
+
 	return {
 		update(newArgs: TOCCrawlerArgs) {
 			args = newArgs;
@@ -104,8 +178,10 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 		destroy() {
 			for(const obs of observers)
 			{
-				obs.disconnect();
+				obs.observer.disconnect();
 			}
+
+			if (scrollTarget) document.querySelector(scrollTarget)?.removeEventListener('scroll', onWindowScroll);
 		}
 	};
 }
