@@ -49,6 +49,10 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 
 	function queryHeadings(): void {
 
+		let permalinkIndexCount = 0;
+
+		const scrollContainer = document.querySelector(scrollTarget) as HTMLElement;
+
 		headings?.forEach((elemHeading) => {
 
 			// If heading has ignore attribute, skip it
@@ -68,26 +72,67 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 			permalinks.push({
 				element: elemHeading.nodeName.toLowerCase(),
 				id: elemHeading.id,
-				text: elemHeading.firstChild?.textContent?.trim() || '',
-				isVisible: false
+				text: elemHeading.firstChild?.textContent?.trim() || ''
 			});
 
-			const nextSibling = elemHeading.nextElementSibling;
+			const divCheck = document.createElement("div");
+			divCheck.classList.add("toc-check")
 
-			//for this to work, the sibling after a header MUST have the data-toc-content attribute
-			if(!nextSibling?.hasAttribute('data-toc-content')) return;
+			elemHeading?.parentNode?.insertBefore(divCheck, elemHeading.nextSibling);
 
-			const observer = new IntersectionObserver(([entry]) => {
-				if (entry.isIntersecting) {
-					tocActiveId.set(elemHeading.id);
+			const headingIndex = permalinkIndexCount++;
+
+			const beforeObserver = new IntersectionObserver(
+				([entry]) => {
+
+					const topBounds = entry?.rootBounds?.top ?? 0;
+
+					if (entry.isIntersecting && entry.boundingClientRect.y > topBounds + 50) {
+						//console.log('in space top', entry, elem.getBoundingClientRect());
+						tocActiveId.set(elemHeading.id);
+					} else if (
+						!entry.isIntersecting &&
+						entry.boundingClientRect.y > topBounds + 50 &&
+						entry.boundingClientRect.y < topBounds + 50 + scrollContainer.offsetHeight
+					) {
+						tocActiveId.set(permalinks[headingIndex - 1]?.id);
+						//console.log('out of space top', entry, elem.getBoundingClientRect());
+					}
+
+				},
+				{
+					rootMargin: '50px 0px -75% 0px',
+					threshold: 0,
+					root: scrollContainer,
 				}
-			}, {
-				rootMargin: '-50% 0px' ,
-				threshold: 0,
-			});
+			);
 
-			observer.observe(nextSibling);
-			observers.push(observer);
+			beforeObserver.observe(divCheck);
+			observers.push(beforeObserver);
+
+			const afterObserver = new IntersectionObserver(
+				([entry]) => {
+
+					const bottomBounds = entry?.rootBounds?.bottom ?? 0;
+
+					if (entry.isIntersecting && entry.boundingClientRect.y < bottomBounds - 50) {
+						//console.log('in space bottom', entry, elem.getBoundingClientRect());
+						tocActiveId.set(permalinks[headingIndex - 1]?.id);
+					} else if (!entry.isIntersecting && entry.boundingClientRect.y < bottomBounds - 50) {
+						//console.log('out of space bottom', entry);
+						tocActiveId.set(elemHeading.id);
+					}
+
+				},
+				{
+					rootMargin: '-75% 0px 50px 0px',
+					threshold: 0,
+					root: scrollContainer,
+				}
+			);
+
+			afterObserver.observe(elemHeading);
+			observers.push(afterObserver);
 		});
 
 		// Set the store with the permalink array
