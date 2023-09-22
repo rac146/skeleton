@@ -5,3 +5,8 @@ export interface TOCHeadingLink {
 	id: string;
 	text: string;
 }
+
+export interface TOCObserver {
+	element: Element;
+	observer: IntersectionObserver;
+}

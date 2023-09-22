@@ -1,7 +1,7 @@
 // Action: Table of Contents Crawler
 
 import { tocStore, tocActiveId } from './stores.js';
-import type { TOCHeadingLink } from './types.js';
+import type { TOCHeadingLink, TOCObserver } from './types.js';
 
 interface TOCCrawlerArgs {
 	/** Set generate mode to automatically set heading IDs. */
@@ -23,7 +23,8 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 	let scrollTarget = 'body';
 	let headings: NodeListOf<HTMLElement> | undefined;
 	let permalinks: TOCHeadingLink[] = [];
-	let observers: IntersectionObserver[] = [];
+	let observers: TOCObserver[] = [];
+	let visibleHeadings: number[] = [];
 
 	function init(): void {
 		// Set accepted list of query elements
@@ -38,7 +39,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 
 		for(const obs of observers)
 		{
-			obs.disconnect();
+			obs.observer.disconnect();
 		}
 
 		observers = [];
@@ -82,57 +83,32 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 
 			const headingIndex = permalinkIndexCount++;
 
-			const beforeObserver = new IntersectionObserver(
-				([entry]) => {
+			const observer = new IntersectionObserver(([entry]) => {
+				const topBounds = entry?.rootBounds?.top ?? 0;
+				const bottomBounds = entry?.rootBounds?.bottom ?? 0;
 
-					const topBounds = entry?.rootBounds?.top ?? 0;
-
-					if (entry.isIntersecting && entry.boundingClientRect.y > topBounds + 50) {
-						//console.log('in space top', entry, elem.getBoundingClientRect());
-						tocActiveId.set(elemHeading.id);
-					} else if (
-						!entry.isIntersecting &&
-						entry.boundingClientRect.y > topBounds + 50 &&
-						entry.boundingClientRect.y < topBounds + 50 + scrollContainer.offsetHeight
-					) {
-						tocActiveId.set(permalinks[headingIndex - 1]?.id);
-						//console.log('out of space top', entry, elem.getBoundingClientRect());
+				if (entry.isIntersecting) {
+					if (visibleHeadings.indexOf(headingIndex) === -1) {
+						visibleHeadings = [...visibleHeadings, headingIndex];
+						//scrollerComponent.updateTabs(false);
 					}
-
-				},
-				{
-					rootMargin: '50px 0px -75% 0px',
-					threshold: 0,
-					root: scrollContainer,
+				} else if (!entry.isIntersecting && entry.boundingClientRect.y < topBounds) {
+					visibleHeadings = visibleHeadings.filter((x) => x != headingIndex);
+					//scrollerComponent.updateTabs(false);
+				} else if (!entry.isIntersecting && entry.boundingClientRect.y > bottomBounds) {
+					visibleHeadings = visibleHeadings.filter((x) => x != headingIndex);
+					//scrollerComponent.updateTabs(true);
 				}
-			);
-
-			beforeObserver.observe(divCheck);
-			observers.push(beforeObserver);
-
-			const afterObserver = new IntersectionObserver(
-				([entry]) => {
-
-					const bottomBounds = entry?.rootBounds?.bottom ?? 0;
-
-					if (entry.isIntersecting && entry.boundingClientRect.y < bottomBounds - 50) {
-						//console.log('in space bottom', entry, elem.getBoundingClientRect());
-						tocActiveId.set(permalinks[headingIndex - 1]?.id);
-					} else if (!entry.isIntersecting && entry.boundingClientRect.y < bottomBounds - 50) {
-						//console.log('out of space bottom', entry);
-						tocActiveId.set(elemHeading.id);
-					}
-
-				},
-				{
-					rootMargin: '-75% 0px 50px 0px',
-					threshold: 0,
+			}, {
+					rootMargin: '1px 0px 1px 0px',
+					threshold: 1,
 					root: scrollContainer,
-				}
-			);
+				});
 
-			afterObserver.observe(divCheck);
-			observers.push(afterObserver);
+				observers.push({
+					observer: observer,
+					element: divCheck,
+				});
 		});
 
 		// Set the store with the permalink array
@@ -149,7 +125,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 		destroy() {
 			for(const obs of observers)
 			{
-				obs.disconnect();
+				obs.observer.disconnect();
 			}
 		}
 	};
