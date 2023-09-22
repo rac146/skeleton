@@ -25,6 +25,7 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 	let permalinks: TOCHeadingLink[] = [];
 	let observers: TOCObserver[] = [];
 	let visibleHeadings: number[] = [];
+	let activeHeadingIndex: number;
 
 	function init(): void {
 		// Set accepted list of query elements
@@ -90,14 +91,14 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 				if (entry.isIntersecting) {
 					if (visibleHeadings.indexOf(headingIndex) === -1) {
 						visibleHeadings = [...visibleHeadings, headingIndex];
-						//scrollerComponent.updateTabs(false);
+						updateActiveHeader(false);
 					}
 				} else if (!entry.isIntersecting && entry.boundingClientRect.y < topBounds) {
 					visibleHeadings = visibleHeadings.filter((x) => x != headingIndex);
-					//scrollerComponent.updateTabs(false);
+					updateActiveHeader(false);
 				} else if (!entry.isIntersecting && entry.boundingClientRect.y > bottomBounds) {
 					visibleHeadings = visibleHeadings.filter((x) => x != headingIndex);
-					//scrollerComponent.updateTabs(true);
+					updateActiveHeader(true);
 				}
 			}, {
 					rootMargin: '1px 0px 1px 0px',
@@ -111,12 +112,40 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 				});
 		});
 
+		tocActiveId.set(permalinks[0].id);
+
 		// Set the store with the permalink array
 		tocStore.set(permalinks);
 	}
 
+	function updateActiveHeader(isBottom: boolean) {
+		if (visibleHeadings.length > 0) {
+			const minIndex = Math.min(...visibleHeadings);
+
+			tocActiveId.set(permalinks[minIndex].id);
+			activeHeadingIndex = minIndex;
+		} else if (activeHeadingIndex > 0 && isBottom) {
+			const newIndex = activeHeadingIndex - 1;
+
+			tocActiveId.set(permalinks[newIndex].id);
+			activeHeadingIndex = newIndex;
+		}
+	}
+
+	function onWindowScroll(): void {
+
+		//don't start observing anything until user starts scrolling
+		for (const obsItem of observers) {
+			obsItem.observer.observe(obsItem.element);
+		}
+
+		document.querySelector(scrollTarget)?.removeEventListener('scroll', onWindowScroll);
+	}
+
 	// Lifecycle
 	init();
+	if (scrollTarget) document.querySelector(scrollTarget)?.addEventListener('scroll', onWindowScroll);
+
 	return {
 		update(newArgs: TOCCrawlerArgs) {
 			args = newArgs;
@@ -127,6 +156,8 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 			{
 				obs.observer.disconnect();
 			}
+
+			if (scrollTarget) document.querySelector(scrollTarget)?.addEventListener('scroll', onWindowScroll);
 		}
 	};
 }
