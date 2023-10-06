@@ -112,7 +112,10 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 				});
 		});
 
-		tocActiveId.set(permalinks[0].id);
+		if(permalinks && permalinks.length > 0)
+ 		{
+			tocActiveId.set(permalinks[0].id);
+ 		}
 
 		// Set the store with the permalink array
 		tocStore.set(permalinks);
@@ -149,7 +152,16 @@ export function tocCrawler(node: HTMLElement, args?: TOCCrawlerArgs) {
 	return {
 		update(newArgs: TOCCrawlerArgs) {
 			args = newArgs;
+
+			if (scrollTarget) {
+				document.querySelector(scrollTarget)?.removeEventListener('scroll', onWindowScroll);
+			}
+
 			init();
+
+			if(scrollTarget) {
+				document.querySelector(scrollTarget)?.addEventListener('scroll', onWindowScroll);
+			}
 		},
 		destroy() {
 			for(const obs of observers)
